@@ -9,9 +9,10 @@ Submodules
 
    rsatoolbox.vis.colors
    rsatoolbox.vis.icon
-   rsatoolbox.vis.mds_plot
    rsatoolbox.vis.model_plot
    rsatoolbox.vis.rdm_plot
+   rsatoolbox.vis.scatter_plot
+   rsatoolbox.vis.timecourse
 
 Module contents
 ---------------

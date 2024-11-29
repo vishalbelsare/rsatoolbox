@@ -83,7 +83,7 @@ Spearman's rho
 Spearman's rank-correlation in its original form is higher for predictions with tied ranks, which introduces an unwanted bias into analyses.
 As a solution earlier versions recommended the use of Kendall's :math:`\tau_a` to remove this problem. This problem can also be solved by using
 the expected Spearman's :math:`\rho` under random tiebreaking as an evaluation criterion instead. This coefficient was called :math:`\rho_a` by Kendall.
-For this expectation there is a direct formula:
+For this expectation there is a direct formula based on the rank transformed entries of the two RDMs :math:`\mathbf{x}` and :math:`\mathbf{y}`:
 
 .. math::
 
@@ -107,4 +107,27 @@ Thus, we generally recommend using this :math:`\rho_a` measure now.
 
 This comparison measure can be accessed using ``method='rho-a'`` or using ``rsatoolbox.rdm.compare_rho_a``.
 
+Bures's similarity
+------------------
+These are a related similarity measure and distance introduced by harvey_2024_ , based on double centered kernel matrices :math:`K_1` and :math:`K_2`.
+The normalized Bures similarity (NBS) is defined as:
+
+.. math::
+
+    NBS(K_1, K_2) = \frac{\mathcal{F}(K_1, K_2)}{\sqrt{\operatorname{Tr}[K_1] \operatorname{Tr}[K_2]}}
+
+where :math:`\mathcal{F}` is known as the fidelity.
+
+.. math::
+
+    \mathcal{F}(K_1, K_2) = \operatorname{Tr}[(K_1^{1/2}K_2K_1^{1/2})^{1/2}]
+
+and relatedly the Bures distance :math:`\mathcal{B}`, a proper metric is defined as:
+
+.. math::
+    \mathcal{B}^2(K_1, K_2) = \operatorname{Tr}[K_1] + \operatorname{Tr}[K_2] - 2 \operatorname{Tr}[(K_1^{1/2}K_2K_1^{1/2})^{1/2}]
+
+
+
 .. _Diedrichsen_2021: https://arxiv.org/abs/2007.02789
+.. _harvey_2024: https://proceedings.mlr.press/v243/harvey24a

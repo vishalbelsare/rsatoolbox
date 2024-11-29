@@ -8,32 +8,53 @@
 import unittest
 import numpy as np
 from numpy.testing import assert_array_almost_equal
+from numpy.testing import assert_almost_equal
 import rsatoolbox as rsa
 
 
 class TestCompareRDM(unittest.TestCase):
 
     def setUp(self):
-        dissimilarities1 = np.random.rand(1, 15)
+        self.rng = np.random.default_rng(0)
+        x = self.rng.random((20, 6))
+        x -= np.mean(x, 1, keepdims=True)
+        self.k1 = x.T @ x
+        diag = np.diag(self.k1)
+        dist = (
+            np.expand_dims(diag, 0)
+            + np.expand_dims(diag, 1)
+            - 2 * self.k1)
+        dissimilarities1 = dist[np.triu_indices(6, 1)]
         des1 = {'session': 0, 'subj': 0}
         self.test_rdm1 = rsa.rdm.RDMs(
             dissimilarities=dissimilarities1,
             dissimilarity_measure='test',
             descriptors=des1)
-        dissimilarities2 = np.random.rand(3, 15)
+        x = self.rng.random((3, 20, 6))
+        x -= np.mean(x, 2, keepdims=True)
+        self.k2 = np.zeros((3, 6, 6))
+        dissimilarities2 = np.zeros((3, 15))
+        for i in range(3):
+            self.k2[i] = x[i].T @ x[i]
+            diag = np.diag(self.k2[i])
+            dist = (
+                np.expand_dims(diag, 0)
+                + np.expand_dims(diag, 1)
+                - 2 * self.k2[i])
+            dissimilarities2[i] = dist[np.triu_indices(6, 1)]
         des2 = {'session': 0, 'subj': 0}
         self.test_rdm2 = rsa.rdm.RDMs(
             dissimilarities=dissimilarities2,
             dissimilarity_measure='test',
             descriptors=des2
-            )
-        dissimilarities3 = np.random.rand(7, 15)
+        )
+        dissimilarities3 = self.rng.random((7, 15))
         des2 = {'session': 0, 'subj': 0}
         self.test_rdm3 = rsa.rdm.RDMs(
             dissimilarities=dissimilarities3,
             dissimilarity_measure='test',
             descriptors=des2
-            )
+        )
 
     def test_compare_cosine(self):
         from rsatoolbox.rdm.compare import compare_cosine
@@ -99,17 +120,17 @@ class TestCompareRDM(unittest.TestCase):
         from rsatoolbox.rdm.compare import compare_neg_riemannian_distance
         dataset1 = []
         for i_subj in range(1):
-            dataset1.append(rsa.data.Dataset(np.random.rand(6, 20),
+            dataset1.append(rsa.data.Dataset(self.rng.random((6, 20)),
                                              descriptors={'subj': i_subj}))
 
         dataset2 = []
         for i_subj in range(5):
-            dataset2.append(rsa.data.Dataset(np.random.rand(6, 20),
+            dataset2.append(rsa.data.Dataset(self.rng.random((6, 20)),
                                              descriptors={'subj': i_subj}))
 
         dataset3 = []
         for i_subj in range(7):
-            dataset3.append(rsa.data.Dataset(np.random.rand(6, 20),
+            dataset3.append(rsa.data.Dataset(self.rng.random((6, 20)),
                                              descriptors={'subj': i_subj}))
 
         rdms1 = rsa.rdm.calc_rdm(dataset1, method='euclidean')
@@ -195,6 +216,35 @@ class TestCompareRDM(unittest.TestCase):
         result = compare_kendall_tau_a(self.test_rdm1, self.test_rdm2)
         assert np.all(result < 1)
 
+    def test_compare_bures_similarity(self):
+        from rsatoolbox.rdm.compare import compare_bures_similarity
+        result = compare_bures_similarity(self.test_rdm1, self.test_rdm1)
+        assert_array_almost_equal(result, 1)
+        result = compare_bures_similarity(self.test_rdm1, self.test_rdm2)
+        assert np.all(result < 1)
+        # check that Kernel transform is ok
+        from rsatoolbox.rdm.compare import _bures_similarity_first_way
+        from rsatoolbox.rdm.compare import _bures_similarity_second_way
+        d_right1 = _bures_similarity_first_way(self.k1, self.k2[0])
+        d_right2 = _bures_similarity_second_way(self.k1, self.k2[0])
+        assert_almost_equal(d_right1, d_right2)
+        assert_almost_equal(d_right1, result[0, 0])
+        assert_almost_equal(d_right2, result[0, 0])
+
+    def test_compare_bures_metric(self):
+        from rsatoolbox.rdm.compare import compare_bures_metric
+        result = compare_bures_metric(self.test_rdm1, self.test_rdm1)
+        assert_array_almost_equal(result, 0)
+        result = compare_bures_metric(self.test_rdm1, self.test_rdm2)
+        # check that Kernel transform is ok
+        from rsatoolbox.rdm.compare import _sq_bures_metric_first_way
+        from rsatoolbox.rdm.compare import _sq_bures_metric_second_way
+        d_right1 = _sq_bures_metric_first_way(self.k1, self.k2[0])
+        d_right2 = _sq_bures_metric_second_way(self.k1, self.k2[0])
+        assert_almost_equal(d_right1, d_right2)
+        assert_almost_equal(d_right1, result[0, 0])
+        assert_almost_equal(d_right2, result[0, 0])
+
     def test_compare(self):
         from rsatoolbox.rdm.compare import compare
         result = compare(self.test_rdm1, self.test_rdm1)
@@ -205,12 +255,15 @@ class TestCompareRDM(unittest.TestCase):
         result = compare(self.test_rdm1, self.test_rdm2, method='cosine')
         result = compare(self.test_rdm1, self.test_rdm2, method='cosine_cov')
         result = compare(self.test_rdm1, self.test_rdm2, method='kendall')
+        result = compare(self.test_rdm1, self.test_rdm2, method='bures')
+        result = compare(self.test_rdm1, self.test_rdm2, method='bures_metric')
 
 
 class TestCompareRDMNaN(unittest.TestCase):
 
     def setUp(self):
-        dissimilarities1 = np.random.rand(1, 15)
+        self.rng = np.random.default_rng(0)
+        dissimilarities1 = self.rng.random((1, 15))
         des1 = {'session': 0, 'subj': 0}
         test_rdm1 = rsa.rdm.RDMs(
             dissimilarities=dissimilarities1,
@@ -218,22 +271,22 @@ class TestCompareRDMNaN(unittest.TestCase):
             descriptors=des1)
         self.test_rdm1 = test_rdm1.subsample_pattern(
             'index', [0, 1, 1, 3, 4, 5])
-        dissimilarities2 = np.random.rand(3, 15)
+        dissimilarities2 = self.rng.random((3, 15))
         des2 = {'session': 0, 'subj': 0}
         test_rdm2 = rsa.rdm.RDMs(
             dissimilarities=dissimilarities2,
             dissimilarity_measure='test',
             descriptors=des2
-            )
+        )
         self.test_rdm2 = test_rdm2.subsample_pattern('index',
                                                      [0, 1, 1, 3, 4, 5])
-        dissimilarities3 = np.random.rand(7, 15)
+        dissimilarities3 = self.rng.random((7, 15))
         des2 = {'session': 0, 'subj': 0}
         test_rdm3 = rsa.rdm.RDMs(
             dissimilarities=dissimilarities3,
             dissimilarity_measure='test',
             descriptors=des2
-            )
+        )
         self.test_rdm3 = test_rdm3.subsample_pattern('index',
                                                      [0, 1, 1, 3, 4, 5])
 
@@ -374,26 +427,27 @@ class TestCompareRDMNaN(unittest.TestCase):
 class TestCompareCov(unittest.TestCase):
 
     def setUp(self):
-        dissimilarities1 = np.random.rand(1, 15)
+        self.rng = np.random.default_rng(0)
+        dissimilarities1 = self.rng.random((1, 15))
         des1 = {'session': 0, 'subj': 0}
         self.test_rdm1 = rsa.rdm.RDMs(
             dissimilarities=dissimilarities1,
             dissimilarity_measure='test',
             descriptors=des1)
-        dissimilarities2 = np.random.rand(3, 15)
+        dissimilarities2 = self.rng.random((3, 15))
         des2 = {'session': 0, 'subj': 0}
         self.test_rdm2 = rsa.rdm.RDMs(
             dissimilarities=dissimilarities2,
             dissimilarity_measure='test',
             descriptors=des2
-            )
-        dissimilarities3 = np.random.rand(7, 15)
+        )
+        dissimilarities3 = self.rng.random((7, 15))
         des2 = {'session': 0, 'subj': 0}
         self.test_rdm3 = rsa.rdm.RDMs(
             dissimilarities=dissimilarities3,
             dissimilarity_measure='test',
             descriptors=des2
-            )
+        )
 
     def test_corr_identity_equal(self):
         from rsatoolbox.rdm.compare import compare
